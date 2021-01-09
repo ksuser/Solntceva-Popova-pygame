@@ -1,5 +1,5 @@
 import pygame as p
-from PyGame_Project import ChessEngine
+import ChessEngine
 from ChessEngine import GameState, Move
 
 
@@ -9,13 +9,12 @@ sq_size = height // dimension
 max_FPS = 15  # для анимации
 images = {}
 
-
 def loadImages():
     pieces = ["wp", "bp", "bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR", "wR", "wN", "wB", "wQ", "wK", "wB", "wN",
               "wR"]
     for piece in pieces:
         images[piece] = p.transform.scale(
-            p.image.load(r"C:\Yandex\Python\PyGame_Project\Figure\\" + piece + ".png"),
+            p.image.load(r"C:\Users\Alina\Desktop\learning\YandexLyceum\Chess\images\\" + piece + ".png"),
             (sq_size, sq_size))
 
 
@@ -25,14 +24,18 @@ def main():
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
     gs = GameState()
+    validMoves = gs.getValidMoves()
+    moveMade = False 
     loadImages()
     running = True
     sqSelected = ()  # Отслеживание последнего щелчка игрока
     playerClicks = []  # Отслеживание щелчков игрока на доске
+    
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
                 running == False
+
             elif e.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()  # Позиция мышки (x, y)
                 col = location[0] // sq_size
@@ -46,9 +49,16 @@ def main():
                 if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
                     move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
-                    gs.makeMove(move)
+                    if move in validMoves:
+                        gs.makeMove(move)
+                        moveMade = True
                     sqSelected = ()  # Сброс кликов игрока
                     playerClicks = []
+        
+
+        if moveMade:
+            validMoves = gs.getValidMoves()
+            moveMade = False
 
         drawGameState(screen, gs)
         clock.tick(max_FPS)
