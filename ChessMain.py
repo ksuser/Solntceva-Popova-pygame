@@ -1,6 +1,6 @@
 import pygame as p
-import ChessEngine
-from ChessEngine import GameState, Move
+import ChessEngine56
+from ChessEngine56 import GameState, Move
 
 width = height = 512
 dimension = 8  # поле шахматное 8 * 8
@@ -47,7 +47,7 @@ def main():
                     sqSelected = (row, col)
                     playerClicks.append(sqSelected)  # Добавление и первого, и второго клика в список
                 if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
-                    move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
+                    move = ChessEngine56.Move(playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
                     if move in validMoves:
                         gs.makeMove(move)
@@ -56,6 +56,10 @@ def main():
                         playerClicks = []
                     else:
                         playerClicks = [sqSelected]
+
+            elif e.type == p.KEYDOWN:
+                if e.type == p.K_z:
+                    gs.undoMove()
 
         if moveMade:
             validMoves = gs.getValidMoves()

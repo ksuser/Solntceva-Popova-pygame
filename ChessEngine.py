@@ -32,12 +32,13 @@ class GameState:
 
     def getValidMoves(self):
         moves = self.getAllPossibleMoves()
-        for i in range(len(moves) - 1, -1, -1):
+        for i in range(len(moves)-1, -1, -1):
             self.makeMove(moves[i])
             self.whiteToMove = not self.whiteToMove
             if self.inCheck():
                 moves.remove(moves[i])
             self.whiteToMove = not self.whiteToMove
+            self.undoMove()
         if len(moves) == 0:
             if self.inCheck():
                 self.checkMate = True
@@ -62,8 +63,8 @@ class GameState:
         self.whiteToMove = not self.whiteToMove  # Обновление хода
         for move in oppMoves:
             if move.endRow == row and move.endCol == column:  # Клетка находится под ударом (королю объявлен шах)
-                self.whiteToMove = not self.whiteToMove  # Курсор возвращается назад, если игрок жмет на фигуру,
-                # которая не может защитить короля / не на короля (??)  // Обновление хода
+                """self.whiteToMove = not self.whiteToMove  # Курсор возвращается назад, если игрок жмет на фигуру,
+                # которая не может защитить короля / не на короля (??)  // Обновление хода"""
                 return True
         return False
 
@@ -177,6 +178,17 @@ class GameState:
                     endPiece = self.board[endRow][endCol]
                     if endPiece[0] != allyColor:  # Пустая клетка или вражеская фигура
                         moves.append(Move((row, column), (endRow, endCol), self.board))
+
+    def undoMove(self):
+        if len(self.moveLog) != 0: # есть что отменять
+            move = self.moveLog.pop()
+            self.board[move.startRow][move.startCol] = move.pieceMoved
+            self.board[move.endRow][move.endCol] = move.pieceCaptured
+            self.whiteToMove = not self.whiteToMove
+            if move.pieceMoved == 'wK':
+                self.whiteKingLocation = (move.startRow, move.startCol)
+            elif move.pieceMoved == 'bK':
+                self.blackKingLocation = (move.endRow, move.endCol)
 
 
 class Move:
