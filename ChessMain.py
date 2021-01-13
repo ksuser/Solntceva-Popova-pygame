@@ -1,7 +1,6 @@
 import pygame as p
-from PyGame_Project import ChessEngine
+import ChessEngine
 from ChessEngine import GameState, Move
-
 
 width = height = 512
 dimension = 8  # поле шахматное 8 * 8
@@ -25,14 +24,18 @@ def main():
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
     gs = GameState()
+    validMoves = gs.getValidMoves()
+    moveMade = False
     loadImages()
     running = True
     sqSelected = ()  # Отслеживание последнего щелчка игрока
     playerClicks = []  # Отслеживание щелчков игрока на доске
+
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
-                running == False
+                running = False
+
             elif e.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()  # Позиция мышки (x, y)
                 col = location[0] // sq_size
@@ -46,9 +49,17 @@ def main():
                 if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
                     move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
-                    gs.makeMove(move)
-                    sqSelected = ()  # Сброс кликов игрока
-                    playerClicks = []
+                    if move in validMoves:
+                        gs.makeMove(move)
+                        moveMade = True
+                        sqSelected = ()  # Сброс кликов игрока
+                        playerClicks = []
+                    else:
+                        playerClicks = [sqSelected]
+
+        if moveMade:
+            validMoves = gs.getValidMoves()
+            moveMade = False
 
         drawGameState(screen, gs)
         clock.tick(max_FPS)
