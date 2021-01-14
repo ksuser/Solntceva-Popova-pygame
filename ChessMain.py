@@ -2,82 +2,125 @@ import pygame as p
 import ChessEngine
 from ChessEngine import GameState, Move
 
-
 width = height = 512
 dimension = 8  # поле шахматное 8 * 8
 sq_size = height // dimension
 max_FPS = 15  # для анимации
 images = {}
 
+
 def loadImages():
     pieces = ["wp", "bp", "bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR", "wR", "wN", "wB", "wQ", "wK", "wB", "wN",
               "wR"]
     for piece in pieces:
         images[piece] = p.transform.scale(
-            p.image.load(r"C:\Users\Alina\Desktop\learning\YandexLyceum\Chess\images\\" + piece + ".png"),
+            p.image.load(r"..\PyGame_Project\Figure\\" + piece + ".png"),
             (sq_size, sq_size))
 
 
 def main():
     p.init()
     screen = p.display.set_mode((width, height))
+    p.display.set_caption('PyGame Project: Шахматы.')
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
     gs = GameState()
     validMoves = gs.getValidMoves()
-    moveMade = False 
+    moveMade = False
+    animate = False
     loadImages()
     running = True
     sqSelected = ()  # Отслеживание последнего щелчка игрока
     playerClicks = []  # Отслеживание щелчков игрока на доске
-    
+    gameOver = False
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
-
             elif e.type == p.MOUSEBUTTONDOWN:
-                location = p.mouse.get_pos()  # Позиция мышки (x, y)
-                col = location[0] // sq_size
-                row = location[1] // sq_size
-                if sqSelected == (row, col):  # Проверка, щелкнул ли игрок на один и тот же квадрат дважды или нет
-                    sqSelected = ()  # Отмена двойного нажатия
-                    playerClicks = []  # Сброс кликов игрока
-                else:
-                    sqSelected = (row, col)
-                    playerClicks.append(sqSelected)  # Добавление и первого, и второго клика в список
-                if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
-                    move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
-                    print(move.getChessNotation())
-                    for i in range(len(validMoves)):
-                        if move == validMoves[i]:
-                            gs.makeMove(validMoves[i])
-                            moveMade = True
-                            sqSelected = ()  # Сброс кликов игрока
-                            playerClicks = []
-                    if not moveMade:
-                        playerClicks = [sqSelected]
+                if not gameOver:
+                    location = p.mouse.get_pos()  # Позиция мышки (x, y)
+                    col = location[0] // sq_size
+                    row = location[1] // sq_size
+                    if sqSelected == (row, col):  # Проверка, щелкнул ли игрок на один и тот же квадрат дважды или нет
+                        sqSelected = ()  # Отмена двойного нажатия
+                        playerClicks = []  # Сброс кликов игрока
+                    else:
+                        sqSelected = (row, col)
+                        playerClicks.append(sqSelected)  # Добавление и первого, и второго клика в список
+                    if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
+                        move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
+                        print(move.getChessNotation())
+                        for i in range(len(validMoves)):
+                            if move == validMoves[i]:
+                                gs.makeMove(validMoves[i])
+                                moveMade = True
+                                animate = True
+                                sqSelected = ()  # Сброс кликов игрока
+                                playerClicks = []
+                        if not moveMade:
+                            playerClicks = [sqSelected]
             
             elif e.type == p.KEYDOWN:
-                if e.type == p.K_z:
+                if e.key == p.K_z:   # Отмена хода при нажании клавиши "z"
                     gs.undoMove()
-        
+                    moveMade = True
+                    animate = False
+                if e.key == p.K_r:
+                    gs = ChessEngine.GameState()
+                    validMoves = gs.getValidMoves()
+                    sqSelected = ()
+                    playerClicks = []
+                    moveMade = False
+                    animate = False
 
         if moveMade:
+            if animate:
+                animateMove(gs.moveLog[-1], screen, gs.board, clock)
             validMoves = gs.getValidMoves()
             moveMade = False
+            animate = False
 
-        drawGameState(screen, gs)
+        drawGameState(screen, gs, validMoves, sqSelected)
+
+        if gs.checkMate:
+            gameOver = True
+            if gs.whiteToMove:
+                drawText(screen, 'Выиграли черные!')
+            else:
+                drawText(screen, 'Выиграли белые!')
+        elif gs.staleMate:
+            gameOver = True
+            drawText(screen, 'Нельзя поставить мат.')
+
         clock.tick(max_FPS)
         p.display.flip()
 
 
-def drawGameState(screen, gs):
+def highlightSquares(screen, gs, validMoves, sqSelected):
+    if sqSelected != ():
+        row, column = sqSelected
+        if gs.board[row][column][0] == ('w' if gs.whiteToMove else 'b'):  # Может ли двигаться фигура на клетке
+            # Выделение клетки(ок)
+            s = p.Surface((sq_size, sq_size))
+            s.set_alpha(100)  # Прозрачность
+            s.fill(p.Color('blue'))
+            screen.blit(s, (sq_size * column, sq_size * row))
+            # Перемещение подсветки на клетку(и)
+            s.fill(p.Color('yellow'))
+            for move in validMoves:
+                if move.startRow == row and move.startCol == column:
+                    screen.blit(s, (move.endCol * sq_size, move.endRow * sq_size))
+
+
+def drawGameState(screen, gs, validMoves, sqSelected):
     drawBoard(screen)
+    highlightSquares(screen, gs, validMoves, sqSelected)
     drawPieces(screen, gs.board)
 
 
 def drawBoard(screen):
+    global colors
     colors = [p.Color("white"), p.Color("grey")]
     for rows in range(dimension):
         for columns in range(dimension):
@@ -91,6 +134,36 @@ def drawPieces(screen, board):
             piece = board[rows][columns]
             if piece != "--":
                 screen.blit(images[piece], p.Rect(columns * sq_size, rows * sq_size, sq_size, sq_size))
+
+
+def animateMove(move, screen, board, clock):
+    global colors
+    coords = []
+    dR = move.endRow - move.startRow
+    dC = move.endCol - move.startCol
+    framesPerSquare = 10
+    frameCount = (abs(dR) + abs(dC)) * framesPerSquare
+    for frame in range(frameCount + 1):
+        row, column = (move.startRow + dR * frame / frameCount, move.startCol + dC * frame / frameCount)
+        drawBoard(screen)
+        drawPieces(screen, board)
+        color = colors[(move.endRow + move.endCol) % 2]
+        endSquare = p.Rect(move.endCol * sq_size, move.endRow * sq_size, sq_size, sq_size)
+        p.draw.rect(screen, color, endSquare)
+        if move.pieceCaptured != '--':
+            screen.blit(images[move.pieceCaptured], endSquare)
+        screen.blit(images[move.pieceMoved], p.Rect(column * sq_size, row * sq_size, sq_size, sq_size))
+        p.display.flip()
+        clock.tick(60)
+
+
+def drawText(screen, text):
+    font = p.font.SysFont("Chat Noir", 32, True, False)
+    textObject = font.render(text, 0, p.Color("Black"))
+    textLocation = p.Rect(0, 0, width, height).move(width / 2 - textObject.get_width() / 2,
+                                                    height / 2 - textObject.get_height() / 2)
+    textObject = font.render(text, 0, p.Color("Gray"))
+    screen.blit(textObject, textLocation.move(2, 2))
 
 
 if __name__ == '__main__':

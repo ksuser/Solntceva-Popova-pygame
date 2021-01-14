@@ -18,6 +18,10 @@ class GameState:
         self.checkMate = False
         self.staleMate = False
         self.enpassantPossible = ()
+        self.currentCastlingRight = CastleRights(True, True, True, True)
+        self.castleRightsLog = [self.currentCastlingRight]
+        self.castleRightsLog = [CastleRights(self.currentCastlingRight.wks, self.currentCastlingRight.bks,
+                                             self.currentCastlingRight.wqs, self.currentCastlingRight.bqs)]
 
     # принимает парааметр Move и выполняет его(не работает для рокировки)
     def makeMove(self, move):
@@ -40,10 +44,24 @@ class GameState:
         if move.pieceMoved[1] == 'p' and abs(move.startRow - move.endRow) == 2:
             self.enpassantPossible = ((move.startRow + move.endRow) // 2, move.startCol)
         else:
-            self.enpassantPossible = ()    
+            self.enpassantPossible = ()
+
+        # Происходит рокировка
+        if move.isCastleMove:
+            if move.endCol - move.startCol == 2:  #
+                self.board[move.endRow][move.endCol - 1] = self.board[move.endRow][move.endCol + 1]
+                self.board[move.endRow][move.endCol + 1] = '--'  #
+            else:  #
+                self.board[move.endRow][move.endCol + 1] = self.board[move.endRow][move.endCol - 2]
+                self.board[move.endRow][move.endCol - 2] = '--'
+
+        # Идет обновление правил рокировки каждый раз, когда ходит ладья / король
+        self.updateCastleRights(move)
+        self.castleRightsLog.append(CastleRights(self.currentCastlingRight.wks, self.currentCastlingRight.bks,
+                                                 self.currentCastlingRight.wqs, self.currentCastlingRight.bqs))
 
     def undoMove(self):
-        if len(self.moveLog) != 0: #есть что отменять
+        if len(self.moveLog) != 0:  # есть что отменять
             move = self.moveLog.pop()
             self.board[move.startRow][move.startCol] = move.pieceMoved
             self.board[move.endRow][move.endCol] = move.pieceCaptured
@@ -58,11 +76,48 @@ class GameState:
                 self.enpassantPossible = (move.endRow, move.endCol)
             if move.pieceMoved[1] == 'p' and abs(move.startRow - move.endRow) == 2:
                 self.enpassantPossible = ()
+            # Отмена правила рокировки
+            self.castleRightsLog.pop()  # Отмена правила рокировки с помощью отмены хода
+            self.currentCastlingRight = self.castleRightsLog[-1]  # Установка правил рокировки на последний в списке
+            #
+            if move.isCastleMove:
+                if move.endCol - move.startCol == 2:
+                    self.board[move.endRow][move.endCol + 1] = self.board[move.endRow][move.endCol - 1]
+                    self.board[move.endRow][move.endCol - 1] = '--'
+                else:
+                    self.board[move.endRow][move.endCol - 2] = self.board[move.endRow][move.endCol + 1]
+                    self.board[move.endRow][move.endCol + 1] = '--'
+
+    def updateCastleRights(self, move):
+        if move.pieceMoved == 'wK':
+            self.currentCastlingRight.wks = False
+            self.currentCastlingRight.wqs = False
+        elif move.pieceMoved == 'bK':
+            self.currentCastlingRight.bks = False
+            self.currentCastlingRight.bqs = False
+        elif move.pieceMoved == 'wR':
+            if move.startRow == 7:
+                if move.startCol == 0:  # Левая ладья
+                    self.currentCastlingRight.wqs = False
+                elif move.startCol == 7:  # Правая ладья
+                    self.currentCastlingRight.wks = False
+        elif move.pieceMoved == 'bR':
+            if move.startRow == 0:
+                if move.startCol == 0:  # Левая ладья
+                    self.currentCastlingRight.bqs = False
+                elif move.startCol == 7:  # Правая ладья
+                    self.currentCastlingRight.bks = False
 
     def getValidMoves(self):
         tempEnpassantPossible = self.enpassantPossible
+        tempCastleRights = CastleRights(self.currentCastlingRight.wks, self.currentCastlingRight.bks,
+                                        self.currentCastlingRight.wqs, self.currentCastlingRight.bqs)
         moves = self.getAllPossibleMoves()
-        for i in range(len(moves)-1, -1, -1):
+        if self.whiteToMove:
+            self.getCastleMoves(self.whiteKingLocation[0], self.whiteKingLocation[1], moves)
+        else:
+            self.getCastleMoves(self.blackKingLocation[0], self.blackKingLocation[1], moves)
+        for i in range(len(moves) - 1, -1, -1):
             self.makeMove(moves[i])
             self.whiteToMove = not self.whiteToMove
             if self.inCheck():
@@ -74,9 +129,9 @@ class GameState:
                 self.checkMate = True
             else:
                 self.staleMate = True
-        
+
         self.enpassantPossible = tempEnpassantPossible
-        
+        self.currentCastlingRight = tempCastleRights
         return moves
 
     # Определение, проверяется ли игрок
@@ -93,8 +148,9 @@ class GameState:
         self.whiteToMove = not self.whiteToMove  # Обновление хода
         for move in oppMoves:
             if move.endRow == row and move.endCol == column:  # Клетка находится под ударом (королю объявлен шах)
-                """self.whiteToMove = not self.whiteToMove  # Курсор возвращается назад, если игрок жмет на фигуру,
-                # которая не может защитить короля / не на короля (??)  // Обновление хода"""
+                # Курсор возвращается назад, если игрок жмет на фигуру,
+                # которая не может защитить короля / не на короля (??)  // Обновление хода
+                self.whiteToMove = not self.whiteToMove
                 return True
         return False
 
@@ -218,6 +274,35 @@ class GameState:
                     endPiece = self.board[endRow][endCol]
                     if endPiece[0] != allyColor:  # Пустая клетка или вражеская фигура
                         moves.append(Move((row, column), (endRow, endCol), self.board))
+            #  self.getCastleMoves(row, column, moves, allyColor)
+
+    def getCastleMoves(self, row, column, moves):
+        if self.squareUnderAttack(row, column):
+            return  # Нельзя сделать рокировку, когда идет проверка
+        if (self.whiteToMove and self.currentCastlingRight.wks) or (
+                not self.whiteToMove and self.currentCastlingRight.bks):
+            self.getKingsideCastleMoves(row, column, moves)
+        if (self.whiteToMove and self.currentCastlingRight.wqs) or (
+                not self.whiteToMove and self.currentCastlingRight.bqs):
+            self.getQueensideCastleMoves(row, column, moves)
+
+    def getKingsideCastleMoves(self, row, column, moves):
+        if self.board[row][column + 1] == '--' and self.board[row][column + 2] == '--':
+            if not self.squareUnderAttack(row, column + 1) and not self.squareUnderAttack(row, column + 2):
+                moves.append(Move(row, column), (row, column + 2), self.board, isCastleMove=True)
+
+    def getQueensideCastleMoves(self, row, column, moves):
+        if self.board[row][column - 1] == '--' and self.board[row][column - 2] == '--' and self.board[row][column - 3]:
+            if not self.squareUnderAttack(row, column - 1) and not self.squareUnderAttack(row, column - 2):
+                moves.append(Move(row, column), (row, column - 2), self.board, isCastleMove=True)
+
+
+class CastleRights:
+    def __init__(self, wks, bks, wqs, bqs):
+        self.wks = wks
+        self.bks = bks
+        self.wqs = wqs
+        self.bqs = bqs
 
 
 class Move:
@@ -229,22 +314,23 @@ class Move:
                    'e': 4, 'f': 5, 'g': 6, 'h': 7}
     colsToFiles = {v: k for k, v in filesToCols.items()}
 
-    def __init__(self, startSq, endSq, board, isEnpassantMove=False):
+    def __init__(self, startSq, endSq, board, isEnpassantMove=False, isCastleMove=False):
         self.startRow = startSq[0]
         self.startCol = startSq[1]
         self.endRow = endSq[0]
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
-        #продвижение пешки
-        self.isPawnPromotion = (self.pieceMoved == 'wp' and self.endRow == 0) or\
-            (self.pieceMoved == 'bp' and self.endRow == 7)
+        # продвижение пешки
+        self.isPawnPromotion = (self.pieceMoved == 'wp' and self.endRow == 0) or \
+                               (self.pieceMoved == 'bp' and self.endRow == 7)
         self.isEnpassantMove = isEnpassantMove
         if self.isEnpassantMove:
             self.pieceCaptured == 'wp' if self.pieceMoved == 'bp' else 'bp'
+        # Происходит рокировка
+        self.isCastleMove = isCastleMove
 
         self.moveID = self.startRow * 1000 + self.startCol * 1000 + self.endRow * 10 + self.endCol
-        
 
     def __eq__(self, other):
         if isinstance(other, Move):
