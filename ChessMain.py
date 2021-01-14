@@ -34,7 +34,7 @@ def main():
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
-                running == False
+                running = False
 
             elif e.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()  # Позиция мышки (x, y)
@@ -49,11 +49,18 @@ def main():
                 if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
                     move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
-                    if move in validMoves:
-                        gs.makeMove(move)
-                        moveMade = True
-                    sqSelected = ()  # Сброс кликов игрока
-                    playerClicks = []
+                    for i in range(len(validMoves)):
+                        if move == validMoves[i]:
+                            gs.makeMove(validMoves[i])
+                            moveMade = True
+                            sqSelected = ()  # Сброс кликов игрока
+                            playerClicks = []
+                    if not moveMade:
+                        playerClicks = [sqSelected]
+            
+            elif e.type == p.KEYDOWN:
+                if e.type == p.K_z:
+                    gs.undoMove()
         
 
         if moveMade:
