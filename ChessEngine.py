@@ -17,6 +17,7 @@ class GameState:
         self.blackKingLocation = (0, 4)
         self.checkMate = False
         self.staleMate = False
+        self.enpassantPossible = ()
 
     # принимает парааметр Move и выполняет его(не работает для рокировки)
     def makeMove(self, move):
@@ -30,7 +31,36 @@ class GameState:
         elif move.pieceMoved == 'bK':
             self.blackKingLocation = (move.endRow, move.endCol)
 
+        if move.isPawnPromotion:
+            self.board[move.endRow][move.endCol] = move.pieceMoved[0] + 'Q'
+
+        if move.isEnpassantMove:
+            self.board[move.startRow][move.startCol] = '--'
+
+        if move.pieceMoved[1] == 'p' and abs(move.startRow - move.endRow) == 2:
+            self.enpassantPossible = ((move.startRow + move.endRow) // 2, move.startCol)
+        else:
+            self.enpassantPossible = ()    
+
+    def undoMove(self):
+        if len(self.moveLog) != 0: #есть что отменять
+            move = self.moveLog.pop()
+            self.board[move.startRow][move.startCol] = move.pieceMoved
+            self.board[move.endRow][move.endCol] = move.pieceCaptured
+            self.whiteToMove = not self.whiteToMove
+            if move.pieceMoved == 'wK':
+                self.whiteKingLocation = (move.startRow, move.startCol)
+            elif move.pieceMoved == 'bK':
+                self.blackKingLocation = (move.endRow, move.endCol)
+            if move.isEnpassantMove:
+                self.board[move.endRow][move.endCol] = '--'
+                self.board[move.startRow][move.endCol] = move.pieceCaptured
+                self.enpassantPossible = (move.endRow, move.endCol)
+            if move.pieceMoved[1] == 'p' and abs(move.startRow - move.endRow) == 2:
+                self.enpassantPossible = ()
+
     def getValidMoves(self):
+        tempEnpassantPossible = self.enpassantPossible
         moves = self.getAllPossibleMoves()
         for i in range(len(moves)-1, -1, -1):
             self.makeMove(moves[i])
@@ -44,9 +74,9 @@ class GameState:
                 self.checkMate = True
             else:
                 self.staleMate = True
-        else:
-            self.checkMate = False
-            self.staleMate = False
+        
+        self.enpassantPossible = tempEnpassantPossible
+        
         return moves
 
     # Определение, проверяется ли игрок
@@ -87,9 +117,15 @@ class GameState:
             if column - 1 >= 0:
                 if self.board[row - 1][column - 1][0] == 'b':
                     moves.append(Move((row, column), (row - 1, column - 1), self.board))
+                elif (row - 1, column - 1) == self.enpassantPossible:
+                    moves.append(Move((row, column), (row - 1, column - 1), self.board, isEnpassantMove=True))
+
             if column + 1 <= 7:  # len(self.road)
                 if self.board[row - 1][column + 1][0] == 'b':
                     moves.append(Move((row, column), (row - 1, column + 1), self.board))
+                elif (row - 1, column + 1) == self.enpassantPossible:
+                    moves.append(Move((row, column), (row - 1, column + 1), self.board, isEnpassantMove=True))
+
         else:  # движение чёрной пешки
             if self.board[row + 1][column] == '--':  # Продвижение пешки на 1 клетку
                 moves.append(Move((row, column), (row + 1, column), self.board))
@@ -99,9 +135,13 @@ class GameState:
                 if column - 1 >= 0:
                     if self.board[row + 1][column - 1][0] == 'w':  # Захват фигуры врага: движение по левой диагонали
                         moves.append(Move((row, column), (row + 1, column - 1), self.board))
+                    elif (row + 1, column - 1) == self.enpassantPossible:
+                        moves.append(Move((row, column), (row + 1, column - 1), self.board, isEnpassantMove=True))
                 if column + 1 <= 7:
                     if self.board[row + 1][column + 1][0] == 'w':  # Захват фигуры врага: движение по правой диагонали
                         moves.append(Move((row, column), (row + 1, column + 1), self.board))
+                    elif (row + 1, column + 1) == self.enpassantPossible:
+                        moves.append(Move((row, column), (row + 1, column + 1), self.board, isEnpassantMove=True))
 
     def getRookMoves(self, row, column, moves):
         directions = ((-1, 0), (0, -1), (1, 0), (0, 1))  # Направления вверх, вниз, влево и вправо
@@ -179,17 +219,6 @@ class GameState:
                     if endPiece[0] != allyColor:  # Пустая клетка или вражеская фигура
                         moves.append(Move((row, column), (endRow, endCol), self.board))
 
-    def undoMove(self):
-        if len(self.moveLog) != 0: # есть что отменять
-            move = self.moveLog.pop()
-            self.board[move.startRow][move.startCol] = move.pieceMoved
-            self.board[move.endRow][move.endCol] = move.pieceCaptured
-            self.whiteToMove = not self.whiteToMove
-            if move.pieceMoved == 'wK':
-                self.whiteKingLocation = (move.startRow, move.startCol)
-            elif move.pieceMoved == 'bK':
-                self.blackKingLocation = (move.endRow, move.endCol)
-
 
 class Move:
     # Сопоставляет ключи со значениями
@@ -200,15 +229,22 @@ class Move:
                    'e': 4, 'f': 5, 'g': 6, 'h': 7}
     colsToFiles = {v: k for k, v in filesToCols.items()}
 
-    def __init__(self, startSq, endSq, board):
+    def __init__(self, startSq, endSq, board, isEnpassantMove=False):
         self.startRow = startSq[0]
         self.startCol = startSq[1]
         self.endRow = endSq[0]
         self.endCol = endSq[1]
         self.pieceMoved = board[self.startRow][self.startCol]
         self.pieceCaptured = board[self.endRow][self.endCol]
+        #продвижение пешки
+        self.isPawnPromotion = (self.pieceMoved == 'wp' and self.endRow == 0) or\
+            (self.pieceMoved == 'bp' and self.endRow == 7)
+        self.isEnpassantMove = isEnpassantMove
+        if self.isEnpassantMove:
+            self.pieceCaptured == 'wp' if self.pieceMoved == 'bp' else 'bp'
+
         self.moveID = self.startRow * 1000 + self.startCol * 1000 + self.endRow * 10 + self.endCol
-        print(self.moveID)
+        
 
     def __eq__(self, other):
         if isinstance(other, Move):
