@@ -148,9 +148,7 @@ class GameState:
         self.whiteToMove = not self.whiteToMove  # Обновление хода
         for move in oppMoves:
             if move.endRow == row and move.endCol == column:  # Клетка находится под ударом (королю объявлен шах)
-                # Курсор возвращается назад, если игрок жмет на фигуру,
-                # которая не может защитить короля / не на короля (??)  // Обновление хода
-                self.whiteToMove = not self.whiteToMove
+                self.whiteToMove = not self.whiteToMove  # Обновление хода
                 return True
         return False
 
