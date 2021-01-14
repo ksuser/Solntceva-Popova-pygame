@@ -1,6 +1,7 @@
 import pygame as p
-import ChessEngine56
-from ChessEngine56 import GameState, Move
+import ChessEngine
+from ChessEngine import GameState, Move
+
 
 width = height = 512
 dimension = 8  # поле шахматное 8 * 8
@@ -8,13 +9,12 @@ sq_size = height // dimension
 max_FPS = 15  # для анимации
 images = {}
 
-
 def loadImages():
     pieces = ["wp", "bp", "bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR", "wR", "wN", "wB", "wQ", "wK", "wB", "wN",
               "wR"]
     for piece in pieces:
         images[piece] = p.transform.scale(
-            p.image.load(r"C:\Yandex\Python\PyGame_Project\Figure\\" + piece + ".png"),
+            p.image.load(r"C:\Users\Alina\Desktop\learning\YandexLyceum\Chess\images\\" + piece + ".png"),
             (sq_size, sq_size))
 
 
@@ -25,12 +25,12 @@ def main():
     screen.fill(p.Color("white"))
     gs = GameState()
     validMoves = gs.getValidMoves()
-    moveMade = False
+    moveMade = False 
     loadImages()
     running = True
     sqSelected = ()  # Отслеживание последнего щелчка игрока
     playerClicks = []  # Отслеживание щелчков игрока на доске
-
+    
     while running:
         for e in p.event.get():
             if e.type == p.QUIT:
@@ -47,19 +47,21 @@ def main():
                     sqSelected = (row, col)
                     playerClicks.append(sqSelected)  # Добавление и первого, и второго клика в список
                 if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
-                    move = ChessEngine56.Move(playerClicks[0], playerClicks[1], gs.board)
+                    move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
-                    if move in validMoves:
-                        gs.makeMove(move)
-                        moveMade = True
-                        sqSelected = ()  # Сброс кликов игрока
-                        playerClicks = []
-                    else:
+                    for i in range(len(validMoves)):
+                        if move == validMoves[i]:
+                            gs.makeMove(validMoves[i])
+                            moveMade = True
+                            sqSelected = ()  # Сброс кликов игрока
+                            playerClicks = []
+                    if not moveMade:
                         playerClicks = [sqSelected]
-
+            
             elif e.type == p.KEYDOWN:
                 if e.type == p.K_z:
                     gs.undoMove()
+        
 
         if moveMade:
             validMoves = gs.getValidMoves()
