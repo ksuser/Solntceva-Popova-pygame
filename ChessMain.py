@@ -60,7 +60,7 @@ def main():
                                 playerClicks = []
                         if not moveMade:
                             playerClicks = [sqSelected]
-            
+
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:   # Отмена хода при нажании клавиши "z"
                     gs.undoMove()
