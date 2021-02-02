@@ -1,6 +1,6 @@
 import pygame as p
-import ChessEngine56
-from ChessEngine56 import GameState, Move
+import ChessEngine
+from ChessEngine import GameState, Move
 
 width = height = 512
 dimension = 8  # поле шахматное 8 * 8
@@ -14,7 +14,7 @@ def loadImages():
               "wR"]
     for piece in pieces:
         images[piece] = p.transform.scale(
-            p.image.load(r"C:\Yandex\Python\PyGame_Project\Figure\\" + piece + ".png"),
+            p.image.load(r"..\PyGame_Project\Figure\\" + piece + ".png"),
             (sq_size, sq_size))
 
 
@@ -27,6 +27,7 @@ def main():
     gs = GameState()
     validMoves = gs.getValidMoves()
     moveMade = False
+    animate = False
     loadImages()
     running = True
     sqSelected = ()  # Отслеживание последнего щелчка игрока
@@ -48,11 +49,12 @@ def main():
                     sqSelected = (row, col)
                     playerClicks.append(sqSelected)  # Добавление и первого, и второго клика в список
                 if len(playerClicks) == 2:  # Проверка после второго клика - был ли он совершен
-                    move = ChessEngine56.Move(playerClicks[0], playerClicks[1], gs.board)
+                    move = ChessEngine.Move(playerClicks[0], playerClicks[1], gs.board)
                     print(move.getChessNotation())
                     if move in validMoves:
                         gs.makeMove(move)
                         moveMade = True
+                        animate = True
                         sqSelected = ()  # Сброс кликов игрока
                         playerClicks = []
                     else:
@@ -61,27 +63,52 @@ def main():
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:  # Отмена хода при нажании клавиши "z"
                     gs.undoMove()
+                    moveMade = True
+                    animate = False
                 if e.key == p.K_r:
-                    gs = ChessEngine56.GameState()
+                    gs = ChessEngine.GameState()
                     validMoves = gs.getValidMoves()
                     sqSelected = ()
                     playerClicks = []
+                    moveMade = False
+                    animate = False
 
         if moveMade:
+            if animate:
+                animateMove(gs.moveLog[-1], screen, gs.board, clock)
             validMoves = gs.getValidMoves()
             moveMade = False
+            animate = False
 
-        drawGameState(screen, gs)
+        drawGameState(screen, gs, validMoves, sqSelected)
         clock.tick(max_FPS)
         p.display.flip()
 
 
-def drawGameState(screen, gs):
+def highlightSquares(screen, gs, validMoves, sqSelected):
+    if sqSelected != ():
+        row, column = sqSelected
+        if gs.board[row][column][0] == ('w' if gs.whiteToMove else 'b'):  # Может ли двигаться фигура на клетке
+            # Выделение клетки(ок)
+            s = p.Surface((sq_size, sq_size))
+            s.set_alpha(100)  # Прозрачность
+            s.fill(p.Color('blue'))
+            screen.blit(s, (sq_size * column, sq_size * row))
+            # Перемещение подсветки на клетку(и)
+            s.fill(p.Color('yellow'))
+            for move in validMoves:
+                if move.startRow == row and move.startCol == column:
+                    screen.blit(s, (move.endCol * sq_size, move.endRow * sq_size))
+
+
+def drawGameState(screen, gs, validMoves, sqSelected):
     drawBoard(screen)
+    highlightSquares(screen, gs, validMoves, sqSelected)
     drawPieces(screen, gs.board)
 
 
 def drawBoard(screen):
+    global colors
     colors = [p.Color("white"), p.Color("grey")]
     for rows in range(dimension):
         for columns in range(dimension):
@@ -95,6 +122,26 @@ def drawPieces(screen, board):
             piece = board[rows][columns]
             if piece != "--":
                 screen.blit(images[piece], p.Rect(columns * sq_size, rows * sq_size, sq_size, sq_size))
+
+
+def animateMove(move, screen, board, clock):
+    global colors
+    dR = move.endRow - move.startRow
+    dC = move.endCol - move.startCol
+    framesPerSquare = 10
+    frameCount = (abs(dR) + abs(dC)) * framesPerSquare
+    for frame in range(frameCount + 1):
+        row, column = (move.startRow + dR * frame / frameCount, move.startCol + dC * frame / frameCount)
+        drawBoard(screen)
+        drawPieces(screen, board)
+        color = colors[(move.endRow + move.endCol) % 2]
+        endSquare = p.Rect(move.endCol * sq_size, move.endRow * sq_size, sq_size, sq_size)
+        p.draw.rect(screen, color, endSquare)
+        if move.pieceCaptured != '--':
+            screen.blit(images[move.pieceCaptured], endSquare)
+        screen.blit(images[move.pieceMoved], p.Rect(column * sq_size, row * sq_size, sq_size, sq_size))
+        p.display.flip()
+        clock.tick(60)
 
 
 if __name__ == '__main__':
